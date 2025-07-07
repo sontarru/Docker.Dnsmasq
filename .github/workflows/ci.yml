@@ -1,0 +1,76 @@
+name: CI
+
+env:
+  NAME: dnsmasq
+
+on:
+  workflow_dispatch:
+
+  pull_request:
+    branches:
+      - main
+
+  push:
+    branches:
+      - main
+
+  release:
+    types:
+      - published
+
+
+jobs:
+  ci-test:
+    if: github.event_name != 'release'
+    name: Test Dockerfile
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Build ${{env.NAME}} docker image
+        run: |
+          docker build .
+
+  ci-release:
+    if: github.event_name == 'release'
+    name: Build and push
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set ${{env.NAME}} version
+        run: |
+          VERSION=$(echo $VERSION | sed 's/^v//')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+        env:
+          VERSION: ${{github.ref_name}}
+
+      - name: Build ${{env.NAME}} docker image
+        run: |
+          docker build . --tag $NAME --build-arg VERSION=$VERSION
+        env:
+          VERSION: ${{env.VERSION}}
+
+      - name: Login to container registry
+        run: echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
+        env:
+          GITHUB_ACTOR: ${{github.actor}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Push ${{env.NAME}} docker image
+        run: |
+          docker tag $NAME $IMAGE_ID:$VERSION
+          docker tag $NAME $IMAGE_ID:latest
+          docker push --all-tags $IMAGE_ID
+        env:
+          NAME: ${{env.NAME}}
+          VERSION: ${{env.VERSION}}
+          IMAGE_ID: ghcr.io/${{github.repository_owner}}/${{env.NAME}}
