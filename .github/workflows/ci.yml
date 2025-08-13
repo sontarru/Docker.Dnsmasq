@@ -49,8 +49,8 @@ jobs:
       - name: Push `${{env.APK_NAME}}` docker image
         if: github.event_name == 'release'
         run: |
-          docker tag $NAME $IMAGE_ID:$TAG
-          docker tag $NAME $IMAGE_ID:latest
+          docker tag $APK_NAME $IMAGE_ID:$IMAGE_TAG
+          docker tag $APK_NAME $IMAGE_ID:latest
           docker push --all-tags $IMAGE_ID
         env:
           IMAGE_ID: ghcr.io/${{github.repository_owner}}/${{env.APK_NAME}}
