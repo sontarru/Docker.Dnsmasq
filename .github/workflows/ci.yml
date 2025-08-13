@@ -1,7 +1,9 @@
 name: CI
 
 env:
-  NAME: dnsmasq
+  APK_NAME: "dnsmasq"
+  APK_VERSION: "2.91-r0"
+  IMAGE_TAG: "2.91.0.0"
 
 on:
   workflow_dispatch:
@@ -18,46 +20,25 @@ on:
     types:
       - published
 
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  ci-test:
-    if: github.event_name != 'release'
-    name: Test Dockerfile
+  build-and-push:
+    name: Build and push the docker image
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Build ${{env.NAME}} docker image
-        run: |
+      - name: Build `${{env.APK_NAME}}` docker image
+        run: >-
           docker build .
-
-  ci-release:
-    if: github.event_name == 'release'
-    name: Build and push
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Set ${{env.NAME}} version
-        run: |
-          VERSION=$(echo $VERSION | sed 's/^v//')
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-        env:
-          VERSION: ${{github.ref_name}}
-
-      - name: Build ${{env.NAME}} docker image
-        run: |
-          docker build . --tag $NAME --build-arg VERSION=$VERSION
-        env:
-          VERSION: ${{env.VERSION}}
+          --tag $APK_NAME
+          --build-arg APK_NAME=$APK_NAME
+          --build-arg APK_VERSION=$APK_VERSION
 
       - name: Login to container registry
         run: echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
@@ -65,12 +46,11 @@ jobs:
           GITHUB_ACTOR: ${{github.actor}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
-      - name: Push ${{env.NAME}} docker image
+      - name: Push `${{env.APK_NAME}}` docker image
+        if: github.event_name == 'release'
         run: |
-          docker tag $NAME $IMAGE_ID:$VERSION
+          docker tag $NAME $IMAGE_ID:$TAG
           docker tag $NAME $IMAGE_ID:latest
           docker push --all-tags $IMAGE_ID
         env:
-          NAME: ${{env.NAME}}
-          VERSION: ${{env.VERSION}}
-          IMAGE_ID: ghcr.io/${{github.repository_owner}}/${{env.NAME}}
+          IMAGE_ID: ghcr.io/${{github.repository_owner}}/${{env.APK_NAME}}
